@@ -288,7 +288,22 @@ async function main() {
           // Handle the request based on method
           let result;
           
-          if (request.method === 'tools/list') {
+          if (request.method === 'initialize') {
+            // Handle initialization
+            result = {
+              protocolVersion: "2024-11-05",
+              capabilities: {
+                tools: {},
+              },
+              serverInfo: {
+                name: "memory-server",
+                version: "0.6.3",
+              },
+            };
+          } else if (request.method === 'ping') {
+            // Handle ping
+            result = {};
+          } else if (request.method === 'tools/list') {
             // Return list of tools
             result = {
               tools: [
