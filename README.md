@@ -123,4 +123,4 @@ This project is based on [Anthropic's memory server](https://github.com/modelcon
 MIT License - see [LICENSE](LICENSE) file for details.
 
 Original memory server: Copyright (c) 2024 Anthropic, PBC  
-Obsidian integration modifications: Copyright (c) 2025 YuNaga224
+Obsidian integration modifications: Copyright (c) 2025 YuNaga224# obsidian-memory-mcp
