@@ -1,0 +1,31 @@
+services:
+  obsidian-memory-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obsidian-memory-mcp
+    # Expose port 6666 for HTTP transport
+    ports:
+      - "6666:6666"
+    
+    # Mount a volume for persistent storage of Markdown files
+    # This allows Obsidian to access the knowledge graph data
+    volumes:
+      # Mount the data directory for persistent storage
+      - ./data:/app/data:rw
+    
+    # Optional: Set environment variables if needed
+    environment:
+      - NODE_ENV=production
+      - PORT=6666
+    
+    # Restart policy - keep the server running
+    restart: unless-stopped
+    
+    # Working directory
+    working_dir: /app
+
+# Named volume for better management
+volumes:
+  obsidian-data:
+    driver: local
