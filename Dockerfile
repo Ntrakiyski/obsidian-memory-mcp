@@ -24,7 +24,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 
 # Create data directory for persistent storage
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data/root_vault
 
 # Set ownership for data directory
 RUN chown -R node:node /app/data

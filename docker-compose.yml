@@ -18,7 +18,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=6666
-      - MEMORY_DIR=/app/data
+      - MEMORY_DIR=/app/data/root_vault
     
     # Restart policy - keep the server running
     restart: unless-stopped
