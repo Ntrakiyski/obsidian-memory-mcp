@@ -4,6 +4,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  InitializeRequestSchema,
+  PingRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Entity, Relation } from './types.js';
 import { MarkdownStorageManager } from './storage/MarkdownStorageManager.js';
@@ -24,6 +26,25 @@ const server = new Server({
       tools: {},
     },
   });
+
+// Handle initialization request
+server.setRequestHandler(InitializeRequestSchema, async () => {
+  return {
+    protocolVersion: "2024-11-05",
+    capabilities: {
+      tools: {},
+    },
+    serverInfo: {
+      name: "memory-server",
+      version: "0.6.3",
+    },
+  };
+});
+
+// Handle ping requests
+server.setRequestHandler(PingRequestSchema, async () => {
+  return {};
+});
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
