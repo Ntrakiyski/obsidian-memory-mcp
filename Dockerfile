@@ -29,14 +29,14 @@ RUN mkdir -p /app/data
 # Set ownership for data directory
 RUN chown -R node:node /app/data
 
+# Create entrypoint script BEFORE switching to non-root user
+RUN echo '#!/bin/sh\nmkdir -p /app/data/root_vault\nexec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
 # Switch to non-root user
 USER node
 
 # Expose port 6666 for HTTP transport
 EXPOSE 6666
-
-# Create entrypoint script
-RUN echo '#!/bin/sh\nmkdir -p /app/data/root_vault\nexec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Use entrypoint to create directory before starting server
 ENTRYPOINT ["/entrypoint.sh"]
