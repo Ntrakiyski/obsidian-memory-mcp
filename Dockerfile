@@ -24,7 +24,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 
 # Create data directory for persistent storage
-RUN mkdir -p /app/data/root_vault
+RUN mkdir -p /app/data
 
 # Set ownership for data directory
 RUN chown -R node:node /app/data
@@ -35,5 +35,9 @@ USER node
 # Expose port 6666 for HTTP transport
 EXPOSE 6666
 
-# Default command - run the MCP server
+# Create entrypoint script
+RUN echo '#!/bin/sh\nmkdir -p /app/data/root_vault\nexec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Use entrypoint to create directory before starting server
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js"]
