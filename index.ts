@@ -303,6 +303,11 @@ async function main() {
           } else if (request.method === 'ping') {
             // Handle ping
             result = {};
+          } else if (request.method === 'notifications/initialized') {
+            // Handle initialized notification (no response needed)
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({}));
+            return;
           } else if (request.method === 'tools/list') {
             // Return list of tools
             result = {
@@ -525,8 +530,15 @@ async function main() {
             throw new Error(`Unknown method: ${request.method}`);
           }
           
+          // Wrap response in JSON-RPC 2.0 format
+          const response = {
+            jsonrpc: "2.0",
+            id: request.id,
+            result: result
+          };
+          
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
+          res.end(JSON.stringify(response));
         } catch (error) {
           console.error('Error handling request:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
