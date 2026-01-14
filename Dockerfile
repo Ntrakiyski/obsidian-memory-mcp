@@ -30,7 +30,10 @@ RUN mkdir -p /app/data
 RUN chown -R node:node /app/data
 
 # Create entrypoint script BEFORE switching to non-root user
-RUN echo '#!/bin/sh\nmkdir -p /app/data/root_vault\nexec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo 'mkdir -p /app/data/root_vault' >> /entrypoint.sh && \
+    echo 'exec "$@"' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
 
 # Switch to non-root user
 USER node
