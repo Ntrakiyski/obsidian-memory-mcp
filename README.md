@@ -67,8 +67,10 @@ docker-compose up -d
 # Verify MCP server is running
 curl http://localhost:6666/health
 
-# Access the dashboard
-# Open http://localhost:6666/dashboard in your browser
+# Access the services
+# MCP server: http://localhost:6666/mcp
+# Dashboard: http://localhost:3000
+# MCP Tools Explorer: http://localhost:3000/mcp-tools
 ```
 
 ### Option 2: Run Locally (Development)
@@ -90,10 +92,12 @@ npm start
 # In a separate terminal, start the dashboard
 cd dashboard
 npm install
+echo "MCP_URL=http://localhost:6666/mcp" > .env.local
 npm run dev
 
-# MCP server: http://localhost:6666
+# MCP server: http://localhost:6666/mcp
 # Dashboard: http://localhost:3000
+# MCP Tools Explorer: http://localhost:3000/mcp-tools
 ```
 
 ## Architecture
@@ -101,11 +105,17 @@ npm run dev
 ```mermaid
 flowchart TB
     subgraph Docker_Network
-        A[Coolify Traefik<br/>Port 6666] --> B[MCP Server<br/>Internal: 6666]
-        A --> C[Next.js Dashboard<br/>Internal: 3000]
+        A[Coolify Traefik] --> B[MCP Server<br/>Port 6666]
+        A --> C[Next.js Dashboard<br/>Port 3000]
     end
     D[User Browser] --> A
     E[Claude Desktop<br/>MCP Client] --> A
+
+    subgraph Dashboard_Internal
+        F[/mcp-tools page] --> G[/api/mcp route]
+        G --> H[Public MCP URL]
+        H --> B
+    end
 ```
 
 ### How It Works
@@ -116,34 +126,86 @@ flowchart TB
    - Health check at `/health`
 
 2. **Next.js Dashboard** - Web interface for visualization
-   - Accessible at `/dashboard` route
-   - Reads data from MCP server
-   - Will display knowledge graph and statistics
+   - Runs on port 3000 internally, exposed via Traefik
+   - Uses server-side API proxy pattern to communicate with MCP server
+   - `/mcp-tools` page provides interactive tool explorer
 
-3. **Traefik Reverse Proxy** (Coolify)
+3. **API Proxy Pattern**
+   - Dashboard's `/api/mcp` route proxies requests to MCP server
+   - Avoids CORS and browser network restrictions
+   - Uses `MCP_URL` environment variable (server-side only)
+   - Handles session management via `Mcp-Session-Id` header
+
+4. **Traefik Reverse Proxy** (Coolify)
    - Routes traffic based on path prefix
-   - `/dashboard` -> Next.js
-   - `/mcp` -> MCP server
+   - Routes to dashboard container at `/`
+   - Routes to MCP server at `/mcp`
    - Automatically configured via Docker labels
 
 ## Dashboard
 
 ### Accessing the Dashboard
 
-The dashboard is available at `/dashboard` on the same port as the MCP server:
+The dashboard is deployed as a separate container and accessed via the root path:
 
-- **Local**: `http://localhost:6666/dashboard`
-- **Production**: `https://your-domain.com/dashboard`
+- **Local**: `http://localhost:3000`
+- **Production**: `https://your-domain.com`
+
+**MCP Tools Explorer**: `/mcp-tools` - Interactive page to explore and execute MCP tools
+
+### Dashboard Architecture
+
+The dashboard uses a **server-side API proxy pattern** to communicate with the MCP server:
+
+```
+Browser -> /mcp-tools page -> /api/mcp route -> MCP Server (public URL)
+```
+
+This approach:
+- Avoids CORS issues when calling MCP from browser
+- Prevents exposure of internal Docker URLs
+- Allows proper session management via headers
+- Works in both local and production environments
+
+### Environment Variables
+
+Create a `.env.local` file in the `dashboard/` directory:
+
+```bash
+# MCP Server URL (server-side only, used by API route)
+# Local: http://localhost:6666/mcp
+# Production: https://your-mcp-domain.com/mcp
+MCP_URL=http://localhost:6666/mcp
+```
+
+**Important**: Use `MCP_URL` (not `NEXT_PUBLIC_`) as this is server-side only.
 
 ### Dashboard Features
 
-The dashboard provides a web interface to:
+- **Home Page** (`/`)
+  - Displays real-time data from the Obsidian vault
+  - File tree grouped by entity type (Reflective, Procedural, Semantic, Episodic)
+  - Interactive markdown editor with live preview
+  - Knowledge graph visualization with force-directed layout
+  - Metadata panel with YAML frontmatter parsing
+  - Displays entity type, creation date, and modification date
 
-- View all entities and their relationships
-- Search through stored memories
-- Visualize the knowledge graph
-- See statistics about your notes, including total note count
-- Navigate through connected entities
+- **MCP Tools Explorer** (`/mcp-tools`)
+  - List all available MCP tools with schemas
+  - Execute tools with dynamic form inputs
+  - View tool results and error messages
+  - Session-based connection management
+
+- **Data Integration**
+  - Fetches data from `/api/nodes` endpoint
+  - Parses YAML frontmatter for metadata display
+  - Real-time loading and error states
+  - Automatic refresh on data changes
+
+- **Race Condition Handling**
+  - Prevents duplicate initialization on page refresh
+  - Proper cleanup on component unmount
+  - Stable connection across React Strict Mode renders
 
 ### Development
 
@@ -155,11 +217,13 @@ cd dashboard
 # Install dependencies
 npm install
 
+# Create .env.local with MCP_URL for local development
+echo "MCP_URL=http://localhost:6666/mcp" > .env.local
+
 # Start development server with hot reload
 npm run dev
 
 # Dashboard runs on http://localhost:3000
-# In development, it connects to MCP server at http://localhost:6666
 ```
 
 ### Building for Production
@@ -167,12 +231,21 @@ npm run dev
 ```bash
 cd dashboard
 
-# Build the Next.js application
+# Build the Next.js application (standalone output)
 npm run build
 
-# The build output is in .next/ directory
+# The build output is in .next/standalone/ directory
 # Ready to be containerized with the provided Dockerfile
 ```
+
+### Docker Deployment
+
+The dashboard uses **standalone output mode** for optimal Docker deployment:
+
+- Multi-stage build for smaller image size
+- Production runs via `node server.js` (not `next start`)
+- Static assets served from `.next/static/`
+- Minimal dependencies in production image
 
 ## Storage Format
 
@@ -182,26 +255,35 @@ Each entity is stored as an individual Markdown file with:
 - **Obsidian-compatible `[[links]]`** for relations
 - **Organized sections** for observations and relations
 
-Example entity file (`John_Doe.md`):
+### Entity Types
+
+The system supports four main entity types (sectors):
+
+- **Reflective** - Self-reflective memories and insights
+- **Procedural** - How-to guides, procedures, and processes
+- **Semantic** - Factual knowledge and concepts
+- **Episodic** - Events and experiences
+
+Example entity file (`documentation_vs_architecture_Implemented.md`):
 
 ```markdown
 ---
-entityType: person
-created: 2025-07-10
-updated: 2025-07-10
+entityType: Reflective
+created: '2026-01-15'
+updated: '2026-01-15'
 ---
 
-# John Doe
+# Documentation vs Architecture
 
 ## Observations
-- Works at Tech Corp
-- Expert in TypeScript
-- Lives in Tokyo
+- Created documentation standards and wiki setup
+- Established template for architecture ADRs
+- Implemented auto-generated API docs from code comments
+- Set up team wiki in Confluence
 
 ## Relations
-- [[Manager of::Alice Smith]]
-- [[Collaborates with::Bob Johnson]]
-- [[Located in::Tokyo Office]]
+- [[related_to::architecture]]
+- [[related_to::knowledge management]]
 ```
 
 ## Configuration
@@ -294,14 +376,85 @@ curl -X POST http://localhost:6666/mcp \
   -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
 ```
 
-#### GET /dashboard
+#### POST /api/mcp (Dashboard)
+
+Next.js API route that proxies requests to the MCP server.
+
+```bash
+# From dashboard container or localhost:3000
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+```
+
+This route:
+- Forwards requests to the MCP server using the `MCP_URL` environment variable
+- Handles session management via `Mcp-Session-Id` header
+- Used by the `/mcp-tools` page to avoid CORS issues
+
+#### GET / (Dashboard)
 
 Next.js dashboard web interface.
 
 ```bash
 # Access in browser
-http://localhost:6666/dashboard
+http://localhost:3000
 ```
+
+#### GET /mcp-tools (Dashboard)
+
+MCP tools explorer page.
+
+```bash
+# Access in browser
+http://localhost:3000/mcp-tools
+```
+
+#### GET /api/nodes (Dashboard)
+
+Fetches all nodes from the MCP server and transforms them for the dashboard.
+
+```bash
+# From dashboard container or localhost:3000
+curl http://localhost:3000/api/nodes
+```
+
+Response:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Reflective",
+      "type": "folder",
+      "expanded": true,
+      "children": [
+        {
+          "name": "documentation_vs_architecture_Implemented.md",
+          "type": "file",
+          "id": "node-0"
+        }
+      ]
+    }
+  ],
+  "fileContents": {
+    "node-0": "---\nentityType: Reflective\ncreated: '2026-01-15'\nupdated: '2026-01-15'\n---\n\n# Documentation vs Architecture\n\n## Observations\n- Created documentation standards\n"
+  },
+  "graphData": {
+    "nodes": [
+      { "id": "node-0", "label": "Documentation", "size": 5, "category": "reflective" }
+    ],
+    "links": []
+  }
+}
+```
+
+This endpoint:
+- Calls the MCP `get_all_nodes` tool
+- Transforms the response into dashboard-compatible format
+- Groups files by entity type into folders
+- Creates graph nodes and links from relations
+- Parses YAML frontmatter for metadata display
 
 ### Available MCP Tools
 
@@ -314,6 +467,29 @@ http://localhost:6666/dashboard
 7. **read_graph** - Get the entire knowledge graph
 8. **search_nodes** - Search entities by query
 9. **open_nodes** - Get specific entities by name
+10. **get_all_nodes** - Get all nodes with full details including metadata, content, and relations
+
+The `get_all_nodes` tool returns:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "documentation_vs_architecture_Implemented",
+      "entityType": "Reflective",
+      "created": "2026-01-15",
+      "updated": "2026-01-15",
+      "observations": [
+        "Created documentation standards"
+      ],
+      "relations": [
+        { "target": "another_node", "type": "related_to" }
+      ],
+      "content": "---\nentityType: Reflective\ncreated: '2026-01-15'\n---\n\n# Documentation\n..."
+    }
+  ]
+}
+```
 
 ## Deployment
 
@@ -372,7 +548,12 @@ docker-compose up -d
 
 # Test endpoints
 curl http://localhost:6666/health
-# Open http://localhost:6666/dashboard in browser
+curl http://localhost:3000
+
+# Access in browser
+# MCP server: http://localhost:6666/mcp
+# Dashboard: http://localhost:3000
+# MCP Tools: http://localhost:3000/mcp-tools
 
 # Stop services
 docker-compose down
@@ -552,29 +733,46 @@ obsidian-memory-mcp/
 │       └── markdownUtils.ts      # Markdown parsing/generation
 ├── dist/                         # Compiled JavaScript (MCP server)
 ├── dashboard/                    # Next.js dashboard application
-│   ├── src/
-│   │   └── app/
-│   │       ├── page.tsx          # Dashboard home page
-│   │       ├── layout.tsx        # Root layout
-│   │       └── globals.css       # Global styles
+│   ├── app/                      # App Router (Next.js 13+)
+│   │   ├── api/
+│   │   │   └── mcp/
+│   │   │       └── route.ts      # API proxy to MCP server
+│   │   ├── mcp-tools/
+│   │   │   └── page.tsx          # MCP tools explorer page
+│   │   ├── page.tsx              # Dashboard home page
+│   │   ├── layout.tsx            # Root layout
+│   │   └── globals.css           # Global styles
+│   ├── components/               # React components (shadcn/ui)
+│   │   └── ui/                   # UI component library
+│   ├── lib/                      # Utility functions
+│   │   └── utils.ts              # Helper utilities
 │   ├── public/                   # Static assets
-│   ├── Dockerfile               # Dashboard containerization
-│   ├── package.json             # Dashboard dependencies
-│   ├── next.config.mjs          # Next.js configuration
-│   └── tsconfig.json            # TypeScript configuration
+│   ├── Dockerfile                # Dashboard containerization
+│   ├── next.config.js            # Next.js configuration (standalone)
+│   ├── package.json              # Dashboard dependencies
+│   ├── tsconfig.json             # TypeScript configuration
+│   └── .env.example              # Environment variable template
 ├── data/                         # Persistent storage (bind mount)
 ├── docker-compose.yml            # Docker configuration (both services)
 ├── Dockerfile                    # MCP server containerization
 ├── package.json                  # MCP server dependencies
-└── tsconfig.json                # TypeScript configuration
+└── tsconfig.json                 # TypeScript configuration
 ```
 
 ### Key Files for Dashboard Development
 
-- `dashboard/src/app/page.tsx` - Main dashboard page
-- `dashboard/next.config.mjs` - Next.js configuration
-- `dashboard/Dockerfile` - Dashboard container build
-- `docker-compose.yml` - Service orchestration
+- `dashboard/app/page.tsx` - Main dashboard home page with real data integration
+- `dashboard/app/mcp-tools/page.tsx` - MCP tools explorer with API integration
+- `dashboard/app/api/mcp/route.ts` - Server-side proxy to MCP server
+- `dashboard/app/api/nodes/route.ts` - Fetches and transforms all nodes for dashboard
+- `dashboard/lib/mock-data.ts` - Data utilities including YAML frontmatter parser
+- `dashboard/components/file-tree.tsx` - File tree navigation component
+- `dashboard/components/editor.tsx` - TipTap-based markdown editor
+- `dashboard/components/graph-view.tsx` - Force-directed graph visualization
+- `dashboard/components/metadata-panel.tsx` - Displays file metadata from frontmatter
+- `dashboard/next.config.js` - Next.js configuration (standalone output)
+- `dashboard/Dockerfile` - Multi-stage container build
+- `docker-compose.yml` - Service orchestration with Traefik labels
 
 ## Troubleshooting
 
@@ -640,7 +838,7 @@ docker-compose restart obsidian-memory-mcp
 
 ### Dashboard Not Loading
 
-**Symptom**: `/dashboard` returns 404 or error
+**Symptom**: Dashboard returns 404 or connection error
 
 **Solution**:
 
@@ -648,12 +846,40 @@ docker-compose restart obsidian-memory-mcp
 # Check dashboard container logs
 docker-compose logs dashboard
 
-# Verify Traefik labels are applied
-docker inspect obsidian-dashboard | grep -A 10 Labels
+# Verify dashboard container is running
+docker-compose ps dashboard
 
-# Check Traefik routing
-curl -v http://localhost:6666/dashboard
+# Check dashboard is responding
+curl http://localhost:3000
+
+# Verify MCP_URL is set correctly
+docker-compose exec dashboard printenv | grep MCP_URL
 ```
+
+### MCP Tools Page Connection Error
+
+**Symptom**: `/mcp-tools` shows "Failed to connect to MCP server"
+
+**Solution**:
+
+```bash
+# Verify MCP_URL environment variable is set
+docker-compose exec dashboard printenv MCP_URL
+
+# Test MCP server directly
+curl http://localhost:6666/health
+curl -X POST http://localhost:6666/mcp -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+
+# For production: verify public URL is accessible
+curl https://your-mcp-domain.com/health
+curl https://your-mcp-domain.com/mcp -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+```
+
+**Common causes**:
+- Wrong `MCP_URL` in dashboard environment
+- MCP server not running
+- Network/firewall blocking public URL access
+- Traefik routing misconfiguration
 
 ### Build Failures
 
@@ -684,9 +910,22 @@ npm run build
    git checkout -b feature/your-feature
    ```
 
-2. Make changes in `dashboard/src/app/`
-3. Test locally with `npm run dev`
-4. Build and test production mode with `npm run build`
+2. Make changes in `dashboard/app/` or `dashboard/components/`
+3. Test locally with proper `.env.local` configuration:
+
+   ```bash
+   cd dashboard
+   echo "MCP_URL=http://localhost:6666/mcp" > .env.local
+   npm run dev
+   ```
+
+4. Build and test production mode:
+
+   ```bash
+   npm run build
+   # Test with: npm start
+   ```
+
 5. Commit and push:
 
    ```bash
@@ -697,6 +936,12 @@ npm run build
 
 6. Create a pull request on GitHub
 
+**Important**: When adding new pages that communicate with MCP:
+- Use the `/api/mcp` route (server-side proxy)
+- Set `MCP_URL` environment variable for production
+- Handle session management with `Mcp-Session-Id` header
+- Test both locally and with Docker build
+
 ### Adding New MCP Tools
 
 1. Add tool definition in `src/index.ts`
@@ -706,14 +951,21 @@ npm run build
 
 ## Roadmap
 
-Future enhancements for the dashboard:
+### Completed Features ✅
 
-- [ ] Knowledge graph visualization
-- [ ] Entity relationship browser
-- [ ] Search functionality
-- [ ] Bulk operations
+- [x] Knowledge graph visualization with force-directed layout
+- [x] Entity type grouping in file tree
+- [x] Real-time metadata display from YAML frontmatter
+- [x] Dashboard integration with MCP server data
+
+### Future Enhancements
+
+- [ ] Advanced search functionality
+- [ ] Bulk operations on entities
 - [ ] Import/Export tools
 - [ ] Dark mode theme
+- [ ] Real-time collaboration
+- [ ] Mobile-responsive design improvements
 
 ## Credits
 
