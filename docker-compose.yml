@@ -37,8 +37,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mcp.rule=PathPrefix(`/mcp`)"
-      - "traefik.http.middlewares.mcp-stripprefix.stripprefix.prefixes=/mcp"
-      - "traefik.http.routers.mcp.middlewares=mcp-stripprefix"
       - "traefik.http.services.mcp.loadbalancer.server.port=6666"
 
   dashboard:
