@@ -1,6 +1,6 @@
 # Obsidian Memory MCP
 
-MCP server that stores AI memories as Markdown files for visualization in Obsidian's graph view.
+MCP (Model Context Protocol) server that stores AI memories as Markdown files for visualization in Obsidian's graph view. Built with TypeScript and Docker for easy deployment.
 
 <a href="https://glama.ai/mcp/servers/@YuNaga224/obsidian-memory-mcp">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@YuNaga224/obsidian-memory-mcp/badge" alt="Obsidian Memory MCP server" />
@@ -16,7 +16,8 @@ This project is a modified version of [Anthropic's memory server](https://github
 - **Obsidian Integration**: Added `[[link]]` syntax for relations
 - **YAML Frontmatter**: Metadata stored in frontmatter instead of JSON
 - **File Structure**: Each entity becomes a separate `.md` file
-- **Removed Features**: Simplified to focus on Markdown-only storage
+- **Docker Support**: Added containerization for easy deployment
+- **HTTP Transport**: Exposed MCP via HTTP for broader compatibility
 
 ## Features
 
@@ -25,6 +26,44 @@ This project is a modified version of [Anthropic's memory server](https://github
 - **Knowledge Graph**: Store entities, relations, and observations
 - **Search Functionality**: Query across all stored memories
 - **YAML Frontmatter**: Metadata stored in frontmatter
+- **Docker Support**: Production-ready container with persistent storage
+- **HTTP Transport**: REST API endpoint for MCP communication
+- **Health Checks**: Built-in monitoring endpoint
+
+## Quick Start
+
+### Option 1: Run with Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/Ntrakiyski/obsidian-memory-mcp.git
+cd obsidian-memory-mcp
+
+# Build and start the container
+docker-compose up -d
+
+# Verify it's running
+curl http://localhost:6666/health
+```
+
+### Option 2: Run Locally (Development)
+
+```bash
+# Clone the repository
+git clone https://github.com/Ntrakiyski/obsidian-memory-mcp.git
+cd obsidian-memory-mcp
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Start the server
+npm start
+
+# Server runs on http://localhost:6666
+```
 
 ## Storage Format
 
@@ -35,6 +74,7 @@ Each entity is stored as an individual Markdown file with:
 - **Organized sections** for observations and relations
 
 Example entity file (`John_Doe.md`):
+
 ```markdown
 ---
 entityType: person
@@ -55,18 +95,82 @@ updated: 2025-07-10
 - [[Located in::Tokyo Office]]
 ```
 
+## Configuration
 
-## Installation & Configuration
+### Environment Variables
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `6666` | HTTP server port |
+| `MEMORY_DIR` | `/app/data/root_vault` | Directory for storing Markdown files |
+| `NODE_ENV` | `production` | Node environment |
+
+### Docker Configuration
+
+The `docker-compose.yml` includes:
+
+- Named volume `obsidian-data` bound to `./data` on host
+- Health check monitoring
+- Auto-restart policy
+- Port mapping `6666:6666`
+
+#### Data Persistence
+
+Files are stored in:
+- **Host**: `./data/root_vault/` (bind mount)
+- **Container**: `/app/data/root_vault/`
+
+This allows:
+- Access to files from host machine
+- Data persistence across container restarts
+- Easy backup and management
+
+## API Reference
+
+### Endpoints
+
+#### GET /health
+Health check endpoint.
 
 ```bash
-git clone https://github.com/YuNaga224/obsidian-memory-mcp.git
-cd obsidian-memory-mcp
-npm install
-npm run build
+curl http://localhost:6666/health
 ```
 
-Then configure in Claude Desktop:
+Response:
+```json
+{
+  "status": "ok",
+  "server": "memory-server",
+  "storageDir": "/app/data/root_vault"
+}
+```
+
+#### POST /mcp
+MCP protocol endpoint for tool calls.
+
+```bash
+curl -X POST http://localhost:6666/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+```
+
+### Available Tools
+
+1. **create_entities** - Create new entities in the knowledge graph
+2. **create_relations** - Create relations between entities
+3. **add_observations** - Add observations to existing entities
+4. **delete_entities** - Delete entities and related data
+5. **delete_observations** - Remove specific observations
+6. **delete_relations** - Remove relations
+7. **read_graph** - Get the entire knowledge graph
+8. **search_nodes** - Search entities by query
+9. **open_nodes** - Get specific entities by name
+
+## Usage with Claude Desktop
+
+### Option 1: Direct Node.js (Local)
+
+Configure in Claude Desktop:
 
 ```json
 {
@@ -82,9 +186,25 @@ Then configure in Claude Desktop:
 }
 ```
 
+### Option 2: HTTP Transport (Docker or Remote)
+
+```json
+{
+  "mcpServers": {
+    "obsidian-memory-http": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-http"],
+      "env": {
+        "MCP_SERVER_URL": "http://localhost:6666/mcp"
+      }
+    }
+  }
+}
+```
+
 ## Usage with Obsidian
 
-1. Configure Claude Desktop with one of the options above
+1. Configure Claude Desktop or MCP client with one of the options above
 2. Restart Claude Desktop
 3. Use the MCP memory tools to create entities and relations
 4. Open Obsidian and view the graph
@@ -94,24 +214,170 @@ The knowledge graph will be visualized with:
 - `[[links]]` as edges
 - Different colors for different entity types (if configured in Obsidian)
 
-## API
+## Docker Management
 
-The server exposes the following tools:
+### Start Services
 
-- `create_entities`: Create new entities
-- `create_relations`: Create relations between entities  
-- `add_observations`: Add observations to existing entities
-- `delete_entities`: Delete entities and related data
-- `delete_observations`: Remove specific observations
-- `delete_relations`: Remove relations
-- `read_graph`: Get the entire knowledge graph
-- `search_nodes`: Search entities by query
-- `open_nodes`: Get specific entities by name
+```bash
+# Start in detached mode
+docker-compose up -d
+
+# Start with logs visible
+docker-compose up
+```
+
+### Stop Services
+
+```bash
+# Stop without removing volumes
+docker-compose down
+
+# Stop and remove volumes (deletes all data)
+docker-compose down -v
+```
+
+### Rebuild After Changes
+
+```bash
+docker-compose build
+docker-compose up -d
+```
+
+### View Logs
+
+```bash
+# All logs
+docker-compose logs
+
+# Follow logs
+docker-compose logs -f
+
+# Specific service
+docker-compose logs obsidian-memory-mcp
+```
+
+### Check Status
+
+```bash
+docker-compose ps
+```
+
+### Verify Storage
+
+```bash
+# Check container is running
+docker-compose ps
+
+# Check health
+curl http://localhost:6666/health
+
+# Check volume exists
+docker volume ls | grep obsidian
+
+# Check host data directory
+ls -la data/
+ls -la data/root_vault/
+```
 
 ## Development
 
+### Commands
+
 ```bash
-npm run watch  # Watch for changes and rebuild
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Start production server
+npm start
+
+# Watch mode (auto-rebuild on changes)
+npm run watch
+
+# Type checking
+npm run typecheck
+
+# Clean build artifacts
+npm run clean
+```
+
+### Project Structure
+
+```
+obsidian-memory-mcp/
+├── src/
+│   ├── index.ts              # Main entry point
+│   ├── types.ts              # TypeScript type definitions
+│   ├── storage/
+│   │   └── MarkdownStorageManager.ts  # Storage layer
+│   └── utils/
+│       ├── pathUtils.ts      # Path handling utilities
+│       └── markdownUtils.ts  # Markdown parsing/generation
+├── dist/                     # Compiled JavaScript
+├── data/                     # Persistent storage (bind mount)
+├── docker-compose.yml        # Docker configuration
+├── Dockerfile               # Docker image definition
+├── package.json             # NPM dependencies
+└── tsconfig.json           # TypeScript configuration
+```
+
+## Troubleshooting
+
+### Permission Denied Errors
+
+**Symptom**: `EACCES: permission denied` or `ENOENT: no such file or directory`
+
+**Solution**:
+```bash
+# Manually create directory with proper permissions
+mkdir -p data/root_vault
+chmod 755 data/root_vault
+docker-compose restart obsidian-memory-mcp
+```
+
+### Container Won't Start
+
+**Symptom**: Container exits immediately or shows errors
+
+**Solution**:
+```bash
+# Check logs for errors
+docker-compose logs obsidian-memory-mcp
+
+# Rebuild and restart
+docker-compose down -v
+docker-compose build
+docker-compose up -d
+```
+
+### Files Not Persisting
+
+**Symptom**: Files exist during container run but disappear after restart
+
+**Solution**:
+```bash
+# Verify volume is properly mounted
+docker inspect obsidian-memory-mcp | grep -A 20 Mounts
+
+# Look for: "Type": "volume" and "Name": "obsidian-data"
+```
+
+### Health Check Fails
+
+**Symptom**: `docker-compose ps` shows unhealthy
+
+**Solution**:
+```bash
+# Check if port is in use
+lsof -i :6666
+
+# Check if server is responding
+curl http://localhost:6666/health
+
+# Restart the service
+docker-compose restart obsidian-memory-mcp
 ```
 
 ## Credits
@@ -123,4 +389,8 @@ This project is based on [Anthropic's memory server](https://github.com/modelcon
 MIT License - see [LICENSE](LICENSE) file for details.
 
 Original memory server: Copyright (c) 2024 Anthropic, PBC  
-Obsidian integration modifications: Copyright (c) 2025 YuNaga224# obsidian-memory-mcp
+Obsidian integration modifications: Copyright (c) 2025 Ntrakiyski
+
+## Support
+
+For issues and feature requests, please open a GitHub issue.
