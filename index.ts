@@ -10,9 +10,44 @@ import {
 import { Entity, Relation } from './types.js';
 import { MarkdownStorageManager } from './storage/MarkdownStorageManager.js';
 import * as http from 'http';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Configuration
 const PORT = parseInt(process.env.PORT || "6666", 10);
+const MEMORY_DIR = process.env.MEMORY_DIR || "/app/data/root_vault";
+
+// Ensure storage directory exists
+function ensureStorageDirectory() {
+  try {
+    if (!fs.existsSync(MEMORY_DIR)) {
+      fs.mkdirSync(MEMORY_DIR, { recursive: true, mode: 0o755 });
+      console.error(`Created storage directory: ${MEMORY_DIR}`);
+    } else {
+      console.error(`Storage directory exists: ${MEMORY_DIR}`);
+    }
+    
+    // Verify it's writable
+    fs.accessSync(MEMORY_DIR, fs.constants.W_OK);
+    console.error(`Storage directory is writable: ${MEMORY_DIR}`);
+  } catch (error) {
+    console.error(`Failed to ensure storage directory: ${error}`);
+    process.exit(1);
+  }
+}
+
+// Verify storage initialization
+function verifyStoragePermissions() {
+  try {
+    const testFile = path.join(MEMORY_DIR, '.test-write-permission');
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    console.error(`Storage write permission verified`);
+  } catch (error) {
+    console.error(`Storage write permission failed: ${error}`);
+    process.exit(1);
+  }
+}
 
 // Create Markdown storage manager
 const storageManager = new MarkdownStorageManager();
@@ -258,6 +293,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
+  // Ensure storage directory exists before starting server
+  ensureStorageDirectory();
+  verifyStoragePermissions();
+
   // Create HTTP server for MCP
   const serverInstance = http.createServer(async (req, res) => {
     // Enable CORS
@@ -273,7 +312,7 @@ async function main() {
 
     if (req.method === 'GET' && req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', server: 'memory-server' }));
+      res.end(JSON.stringify({ status: 'ok', server: 'memory-server', storageDir: MEMORY_DIR }));
       return;
     }
 
@@ -555,6 +594,7 @@ async function main() {
 
   serverInstance.listen(PORT, () => {
     console.error(`Knowledge Graph MCP Server running on http://localhost:${PORT}`);
+    console.error(`Storage directory: ${MEMORY_DIR}`);
     console.error(`Endpoints:`);
     console.error(`  - GET  /health - Health check`);
     console.error(`  - POST /mcp   - MCP endpoint`);

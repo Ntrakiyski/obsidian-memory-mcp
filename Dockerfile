@@ -23,16 +23,17 @@ RUN npm ci --omit=dev --ignore-scripts
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
-# Create data directory for persistent storage
-RUN mkdir -p /app/data
+# Create data directory for persistent storage BEFORE switching user
+RUN mkdir -p /app/data/root_vault && \
+    chown -R node:node /app/data
 
-# Set ownership for data directory
-RUN chown -R node:node /app/data
-
-# Create entrypoint script BEFORE switching to non-root user
+# Create entrypoint script to ensure directory ownership on container start
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
-    echo 'mkdir -p /app/data/root_vault 2>/dev/null || true' >> /entrypoint.sh && \
-    echo 'chown -R node:node /app/data/root_vault 2>/dev/null || true' >> /entrypoint.sh && \
+    echo 'set -e' >> /entrypoint.sh && \
+    echo '# Ensure data directory exists and has correct permissions' >> /entrypoint.sh && \
+    echo 'mkdir -p /app/data/root_vault' >> /entrypoint.sh && \
+    echo 'chown -R node:node /app/data' >> /entrypoint.sh && \
+    echo 'chmod -R 755 /app/data' >> /entrypoint.sh && \
     echo 'exec "$@"' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
@@ -42,6 +43,6 @@ USER node
 # Expose port 6666 for HTTP transport
 EXPOSE 6666
 
-# Use entrypoint to create directory before starting server
+# Use entrypoint to create directory and set permissions before starting server
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js"]
