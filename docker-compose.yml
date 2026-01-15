@@ -7,10 +7,6 @@ services:
       dockerfile: Dockerfile
     container_name: obsidian-memory-mcp
     
-    # Expose port 6666 for HTTP transport
-    ports:
-      - "6666:6666"
-    
     # Mount a volume for persistent storage of Markdown files
     # This allows other services to access the knowledge graph data
     volumes:
@@ -36,6 +32,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    
+    # Traefik routing labels for Coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mcp.rule=PathPrefix(`/mcp`)"
+      - "traefik.http.services.mcp.loadbalancer.server.port=6666"
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: obsidian-dashboard
+    
+    # Restart policy - keep the service running
+    restart: unless-stopped
+    
+    # Traefik routing labels for Coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`)"
+      - "traefik.http.services.dashboard.loadbalancer.server.port=3000"
 
 # Named volume for better management and multi-service access
 volumes:
