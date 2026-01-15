@@ -50,6 +50,7 @@ A new **Next.js Dashboard** has been added to visualize and explore your Obsidia
 - **HTTP Transport**: REST API endpoint for MCP communication
 - **Health Checks**: Built-in monitoring endpoint
 - **Dashboard**: Web interface for visualizing notes
+- **Notes Counter**: Real-time display of total markdown files in the vault
 
 ## Quick Start
 
@@ -141,7 +142,7 @@ The dashboard provides a web interface to:
 - View all entities and their relationships
 - Search through stored memories
 - Visualize the knowledge graph
-- See statistics about your notes
+- See statistics about your notes, including total note count
 - Navigate through connected entities
 
 ### Development
@@ -264,6 +265,24 @@ Response:
   "storageDir": "/app/data/root_vault"
 }
 ```
+
+#### GET /count
+
+Returns the total count of markdown files in the vault.
+
+```bash
+curl http://localhost:6666/count
+```
+
+Response:
+
+```json
+{
+  "count": 42
+}
+```
+
+This endpoint is used by the dashboard to display the real-time total notes count.
 
 #### POST /mcp
 
@@ -692,7 +711,6 @@ Future enhancements for the dashboard:
 - [ ] Knowledge graph visualization
 - [ ] Entity relationship browser
 - [ ] Search functionality
-- [ ] Statistics dashboard
 - [ ] Bulk operations
 - [ ] Import/Export tools
 - [ ] Dark mode theme
