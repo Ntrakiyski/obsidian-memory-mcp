@@ -367,21 +367,77 @@ export class MarkdownStorageManager {
    */
   async openNodes(names: string[]): Promise<KnowledgeGraph> {
     const graph = await this.loadGraph();
-    
+
     // Filter entities
     const filteredEntities = graph.entities.filter(e => names.includes(e.name));
-    
+
     // Get filtered entity names
     const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
-    
+
     // Filter relations
-    const filteredRelations = graph.relations.filter(r => 
+    const filteredRelations = graph.relations.filter(r =>
       filteredEntityNames.has(r.from) && filteredEntityNames.has(r.to)
     );
-    
+
     return {
       entities: filteredEntities,
       relations: filteredRelations
     };
+  }
+
+  /**
+   * Get all nodes in a format suitable for the home page UI
+   * Returns detailed information including metadata, content, and relations
+   */
+  async getAllNodes(): Promise<{
+    nodes: Array<{
+      name: string;
+      entityType: string;
+      created?: string;
+      updated?: string;
+      observations: string[];
+      relations: Array<{
+        target: string;
+        type?: string;
+      }>;
+      content: string;
+    }>;
+  }> {
+    await this.ensureMemoryDir();
+
+    try {
+      const files = await fs.readdir(this.memoryDir);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+
+      const nodes = await Promise.all(
+        mdFiles.map(async (file) => {
+          const filePath = path.join(this.memoryDir, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const entityName = getEntityNameFromPath(filePath);
+          if (!entityName) return null;
+
+          const parsed = parseMarkdown(content, entityName);
+
+          return {
+            name: entityName,
+            entityType: parsed.metadata.entityType || 'unknown',
+            created: parsed.metadata.created,
+            updated: parsed.metadata.updated,
+            observations: parsed.observations,
+            relations: parsed.relations.map(rel => ({
+              target: rel.to,
+              type: rel.relationType
+            })),
+            content: content
+          };
+        })
+      );
+
+      return {
+        nodes: nodes.filter((n): n is NonNullable<typeof n> => n !== null)
+      };
+    } catch (error) {
+      throw new Error(`Failed to get all nodes: ${error}`);
+    }
   }
 }

@@ -254,6 +254,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["names"],
         },
       },
+      {
+        name: "get_all_nodes",
+        description: "Get all nodes in the knowledge graph with full details including metadata, content, and relations. Suitable for the home page UI.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -287,6 +295,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: JSON.stringify(await storageManager.searchNodes(args.query as string), null, 2) }] };
     case "open_nodes":
       return { content: [{ type: "text", text: JSON.stringify(await storageManager.openNodes(args.names as string[]), null, 2) }] };
+    case "get_all_nodes":
+      return { content: [{ type: "text", text: JSON.stringify(await storageManager.getAllNodes(), null, 2) }] };
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -535,6 +545,14 @@ async function main() {
                     required: ["names"],
                   },
                 },
+                {
+                  name: "get_all_nodes",
+                  description: "Get all nodes in the knowledge graph with full details including metadata, content, and relations. Suitable for the home page UI.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {},
+                  },
+                },
               ],
             };
           } else if (request.method === 'tools/call') {
@@ -575,6 +593,9 @@ async function main() {
                 break;
               case "open_nodes":
                 result = { content: [{ type: "text", text: JSON.stringify(await storageManager.openNodes(args.names as string[]), null, 2) }] };
+                break;
+              case "get_all_nodes":
+                result = { content: [{ type: "text", text: JSON.stringify(await storageManager.getAllNodes(), null, 2) }] };
                 break;
               default:
                 throw new Error(`Unknown tool: ${name}`);
