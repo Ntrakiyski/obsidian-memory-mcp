@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Internal MCP server URL (Docker network)
-const MCP_SERVER_URL = process.env.MCP_URL || "http://obsidian-memory-mcp:6666";
+// This should be the full URL including /mcp path
+const MCP_SERVER_URL = process.env.MCP_URL || "http://obsidian-memory-mcp:6666/mcp";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    console.log("MCP Proxy: Requesting", JSON.stringify(body, null, 2));
+    console.log("MCP Proxy: Target URL", MCP_SERVER_URL);
+
     // Forward the request to the MCP server
-    const response = await fetch(`${MCP_SERVER_URL}/mcp`, {
+    const response = await fetch(MCP_SERVER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -23,6 +27,8 @@ export async function POST(request: NextRequest) {
     // Get response data
     const data = await response.json();
 
+    console.log("MCP Proxy: Response status", response.status);
+
     // Create response with session ID if present
     const nextResponse = NextResponse.json(data, { status: response.status });
     if (sessionId) {
@@ -33,7 +39,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("MCP proxy error:", error);
     return NextResponse.json(
-      { error: "Failed to connect to MCP server" },
+      { error: "Failed to connect to MCP server", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

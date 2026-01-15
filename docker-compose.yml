@@ -52,7 +52,9 @@ services:
 
     # Environment variables
     environment:
-      # Use internal Docker network URL for MCP server communication
+      # Server-side: API route uses this to connect to MCP server
+      - MCP_URL=http://obsidian-memory-mcp:6666/mcp
+      # Client-side: Not currently used, but kept for reference
       - NEXT_PUBLIC_MCP_URL=http://obsidian-memory-mcp:6666
 
     # Traefik routing labels for Coolify
