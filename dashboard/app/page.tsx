@@ -300,7 +300,7 @@ export default function ObsidianVault() {
                   width: showRightPanel ? `calc(${100 - editorWidth}% - ${metadataWidth}px)` : `${100 - editorWidth}%`,
                 }}
               >
-                <GraphView data={graphData} onLinkClick={handleLinkClick} />
+                <GraphView data={graphData} onNodeClick={handleLinkClick} activeNodeId={activeFileId} />
               </div>
             </>
           )}
@@ -313,7 +313,7 @@ export default function ObsidianVault() {
                 onMouseDown={() => setResizingPanel("metadata")}
               />
               <div className="shrink-0 overflow-y-auto" style={{ width: `${metadataWidth}px` }}>
-                <MetadataPanel metadata={metadata} />
+                <MetadataPanel fileName={currentFileName} metadata={metadata} />
               </div>
             </>
           )}

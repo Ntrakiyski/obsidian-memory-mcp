@@ -238,6 +238,7 @@ export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, o
   const htmlContent = markdownToHtml(content)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         codeBlock: false,

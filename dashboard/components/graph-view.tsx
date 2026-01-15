@@ -47,7 +47,7 @@ export function GraphView({ data, onNodeClick, activeNodeId }: GraphViewProps) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const nodesRef = useRef<GraphNode[]>([])
   const linksRef = useRef<{ source: GraphNode; target: GraphNode }[]>([])
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | undefined>(undefined)
   const draggingRef = useRef<GraphNode | null>(null)
   const isPanningRef = useRef(false)
   const lastMouseRef = useRef({ x: 0, y: 0 })
@@ -139,12 +139,12 @@ export function GraphView({ data, onNodeClick, activeNodeId }: GraphViewProps) {
       // Update positions
       nodes.forEach((node) => {
         if (node.fx === null || node.fx === undefined) {
-          node.vx! *= 0.9
-          node.x! += node.vx
+          node.vx = (node.vx || 0) * 0.9
+          node.x = (node.x || 0) + node.vx
         }
         if (node.fy === null || node.fy === undefined) {
-          node.vy! *= 0.9
-          node.y! += node.vy
+          node.vy = (node.vy || 0) * 0.9
+          node.y = (node.y || 0) + node.vy
         }
       })
     }
