@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Get MCP server URL from environment
 const getMcpUrl = () => {
-  // In production, use internal Docker URL; locally use localhost
+  // In production, use internal Docker URL (service name)
+  // This is hardcoded because environment variables might be overridden by Coolify
+  if (process.env.NODE_ENV === 'production') {
+    return 'http://obsidian-memory-mcp:6666/mcp';
+  }
+  // For local development
   return process.env.NEXT_PUBLIC_BASE_URL 
     ? `${process.env.NEXT_PUBLIC_BASE_URL}/mcp`
     : 'http://localhost:6666/mcp';
