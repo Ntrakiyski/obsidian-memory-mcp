@@ -37,6 +37,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mcp.rule=PathPrefix(`/mcp`)"
+      - "traefik.http.middlewares.mcp-stripprefix.stripprefix.prefixes=/mcp"
+      - "traefik.http.routers.mcp.middlewares=mcp-stripprefix"
       - "traefik.http.services.mcp.loadbalancer.server.port=6666"
 
   dashboard:
@@ -44,20 +46,19 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: obsidian-dashboard
-    
+
     # Restart policy - keep the service running
     restart: unless-stopped
-    
+
     # Environment variables
     environment:
       # Use internal Docker network URL for MCP server communication
-      # The dashboard calls /api/mcp/* routes which then connect to the MCP server
-      - NEXT_PUBLIC_BASE_URL=http://obsidian-memory-mcp:6666
-    
+      - NEXT_PUBLIC_MCP_URL=http://obsidian-memory-mcp:6666
+
     # Traefik routing labels for Coolify
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/`)"
       - "traefik.http.services.dashboard.loadbalancer.server.port=3000"
 
 # Named volume for better management and multi-service access
