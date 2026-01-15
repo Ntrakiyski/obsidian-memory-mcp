@@ -52,10 +52,8 @@ services:
 
     # Environment variables
     environment:
-      # Server-side: API route uses this to connect to MCP server
-      - MCP_URL=http://obsidian-memory-mcp:6666/mcp
-      # Client-side: Not currently used, but kept for reference
-      - NEXT_PUBLIC_MCP_URL=http://obsidian-memory-mcp:6666
+      # Use public URL for MCP server connection
+      - MCP_URL=https://obsidian-mcp.trakiyski.work/mcp
 
     # Traefik routing labels for Coolify
     labels:

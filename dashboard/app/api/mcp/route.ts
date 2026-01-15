@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Internal MCP server URL (Docker network)
-// This should be the full URL including /mcp path
-const MCP_SERVER_URL = process.env.MCP_URL || "http://obsidian-memory-mcp:6666/mcp";
+// Use public URL for MCP server
+const MCP_SERVER_URL = process.env.MCP_URL || "https://obsidian-mcp.trakiyski.work/mcp";
 
 export async function POST(request: NextRequest) {
   try {
