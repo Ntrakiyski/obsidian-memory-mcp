@@ -1,38 +1,98 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
-import { Search, Settings, Network, Menu, X, Info } from "lucide-react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { Search, Settings, Network, Menu, X, Info, Loader2, AlertCircle } from "lucide-react"
 import { FileTree } from "@/components/file-tree"
 import { Editor } from "@/components/editor"
 import { GraphView } from "@/components/graph-view"
 import { MetadataPanel } from "@/components/metadata-panel"
-import { folderStructure, fileContents, graphData, findFile, getFileMetadata } from "@/lib/mock-data"
+import { findFile, getFileMetadata, TreeNode } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export default function ObsidianVault() {
-  const [activeFileId, setActiveFileId] = useState("daily-1")
-  const [content, setContent] = useState(fileContents["daily-1"])
+  // Data state
+  const [folders, setFolders] = useState<TreeNode[]>([])
+  const [fileContents, setFileContents] = useState<Record<string, string>>({})
+  const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // UI state
+  const [activeFileId, setActiveFileId] = useState<string | null>(null)
+  const [content, setContent] = useState("")
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [showSidebar, setShowSidebar] = useState(true)
   const [showGraphPanel, setShowGraphPanel] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDirty, setIsDirty] = useState(false)
-  const [folders, setFolders] = useState(folderStructure)
 
-  const [sidebarWidth, setSidebarWidth] = useState(256) // 16rem = 256px
+  const [sidebarWidth, setSidebarWidth] = useState(256)
   const [editorWidth, setEditorWidth] = useState(60)
-  const [metadataWidth, setMetadataWidth] = useState(320) // 20rem = 320px
+  const [metadataWidth, setMetadataWidth] = useState(320)
 
   const [resizingPanel, setResizingPanel] = useState<"sidebar" | "editor" | "metadata" | null>(null)
-
   const [newFolderName, setNewFolderName] = useState("")
   const [showFolderNameInput, setShowFolderNameInput] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const mainContainerRef = useRef<HTMLDivElement>(null)
 
-  const currentFileName = useMemo(() => findFile(folders, activeFileId) || "Untitled", [activeFileId, folders])
+  // Fetch nodes from API
+  useEffect(() => {
+    async function fetchNodes() {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const response = await fetch("/api/nodes")
+        const data = await response.json()
 
-  const metadata = useMemo(() => getFileMetadata(activeFileId), [activeFileId])
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch nodes")
+        }
+
+        setFolders(data.nodes || [])
+        setFileContents(data.fileContents || {})
+        setGraphData(data.graphData || { nodes: [], links: [] })
+
+        // Set first file as active if available
+        const firstFile = findFirstFile(data.nodes || [])
+        if (firstFile) {
+          setActiveFileId(firstFile.id)
+          setContent((data.fileContents || {})[firstFile.id] || "")
+        }
+      } catch (err) {
+        console.error("Error fetching nodes:", err)
+        setError(err instanceof Error ? err.message : "Failed to load data")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchNodes()
+  }, [])
+
+  // Helper to find first file in tree
+  const findFirstFile = useCallback((nodes: TreeNode[]): TreeNode | null => {
+    for (const node of nodes) {
+      if (node.type === "file" && node.id) {
+        return node
+      }
+      if (node.children) {
+        const found = findFirstFile(node.children)
+        if (found) return found
+      }
+    }
+    return null
+  }, [])
+
+  const currentFileName = useMemo(() => {
+    if (!activeFileId) return "No file selected"
+    return findFile(folders, activeFileId) || "Untitled"
+  }, [activeFileId, folders])
+
+  const metadata = useMemo(() => {
+    if (!activeFileId) return null
+    return getFileMetadata(activeFileId)
+  }, [activeFileId])
 
   const handleSelectFile = (id: string) => {
     setActiveFileId(id)
@@ -178,6 +238,35 @@ export default function ObsidianVault() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Loading State */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading Obsidian vault...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 max-w-md text-center px-4">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <div>
+              <p className="font-medium">Failed to load data</p>
+              <p className="text-sm text-muted-foreground mt-1">{error}</p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
         <div className="flex items-center gap-3">
