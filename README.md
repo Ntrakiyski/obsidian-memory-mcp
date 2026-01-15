@@ -1,14 +1,33 @@
 # Obsidian Memory MCP
 
-MCP (Model Context Protocol) server that stores AI memories as Markdown files for visualization in Obsidian's graph view. Built with TypeScript and Docker for easy deployment.
+MCP (Model Context Protocol) server that stores AI memories as Markdown files for visualization in Obsidian's graph view. Includes a Next.js dashboard for visualizing notes. Built with TypeScript and Docker for easy deployment.
 
 <a href="https://glama.ai/mcp/servers/@YuNaga224/obsidian-memory-mcp">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@YuNaga224/obsidian-memory-mcp/badge" alt="Obsidian Memory MCP server" />
 </a>
 
+## Table of Contents
+
+- [About](#about)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Dashboard](#dashboard)
+- [Storage Format](#storage-format)
+- [Configuration](#configuration)
+- [API Reference](#api-reference)
+- [Deployment](#deployment)
+- [Development](#development)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Credits](#credits)
+- [License](#license)
+
 ## About
 
 This project is a modified version of [Anthropic's memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) that has been adapted for Obsidian integration. The original server stored memories in JSON format, while this version stores them as individual Markdown files with Obsidian-compatible `[[link]]` syntax for graph visualization.
+
+A new **Next.js Dashboard** has been added to visualize and explore your Obsidian notes through a web interface.
 
 ### Key Changes from Original
 
@@ -18,6 +37,7 @@ This project is a modified version of [Anthropic's memory server](https://github
 - **File Structure**: Each entity becomes a separate `.md` file
 - **Docker Support**: Added containerization for easy deployment
 - **HTTP Transport**: Exposed MCP via HTTP for broader compatibility
+- **Dashboard**: Added Next.js web interface at `/dashboard`
 
 ## Features
 
@@ -29,6 +49,7 @@ This project is a modified version of [Anthropic's memory server](https://github
 - **Docker Support**: Production-ready container with persistent storage
 - **HTTP Transport**: REST API endpoint for MCP communication
 - **Health Checks**: Built-in monitoring endpoint
+- **Dashboard**: Web interface for visualizing notes
 
 ## Quick Start
 
@@ -39,11 +60,14 @@ This project is a modified version of [Anthropic's memory server](https://github
 git clone https://github.com/Ntrakiyski/obsidian-memory-mcp.git
 cd obsidian-memory-mcp
 
-# Build and start the container
+# Build and start all services (MCP server + Dashboard)
 docker-compose up -d
 
-# Verify it's running
+# Verify MCP server is running
 curl http://localhost:6666/health
+
+# Access the dashboard
+# Open http://localhost:6666/dashboard in your browser
 ```
 
 ### Option 2: Run Locally (Development)
@@ -53,16 +77,100 @@ curl http://localhost:6666/health
 git clone https://github.com/Ntrakiyski/obsidian-memory-mcp.git
 cd obsidian-memory-mcp
 
+# Install MCP server dependencies
+npm install
+
+# Build the MCP server
+npm run build
+
+# Start the MCP server (runs on port 6666)
+npm start
+
+# In a separate terminal, start the dashboard
+cd dashboard
+npm install
+npm run dev
+
+# MCP server: http://localhost:6666
+# Dashboard: http://localhost:3000
+```
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Docker_Network
+        A[Coolify Traefik<br/>Port 6666] --> B[MCP Server<br/>Internal: 6666]
+        A --> C[Next.js Dashboard<br/>Internal: 3000]
+    end
+    D[User Browser] --> A
+    E[Claude Desktop<br/>MCP Client] --> A
+```
+
+### How It Works
+
+1. **MCP Server** - Handles memory operations via Model Context Protocol
+   - Stores entities, relations, and observations as Markdown files
+   - Accessible at `/mcp` endpoint
+   - Health check at `/health`
+
+2. **Next.js Dashboard** - Web interface for visualization
+   - Accessible at `/dashboard` route
+   - Reads data from MCP server
+   - Will display knowledge graph and statistics
+
+3. **Traefik Reverse Proxy** (Coolify)
+   - Routes traffic based on path prefix
+   - `/dashboard` -> Next.js
+   - `/mcp` -> MCP server
+   - Automatically configured via Docker labels
+
+## Dashboard
+
+### Accessing the Dashboard
+
+The dashboard is available at `/dashboard` on the same port as the MCP server:
+
+- **Local**: `http://localhost:6666/dashboard`
+- **Production**: `https://your-domain.com/dashboard`
+
+### Dashboard Features
+
+The dashboard provides a web interface to:
+
+- View all entities and their relationships
+- Search through stored memories
+- Visualize the knowledge graph
+- See statistics about your notes
+- Navigate through connected entities
+
+### Development
+
+To run the dashboard separately for development:
+
+```bash
+cd dashboard
+
 # Install dependencies
 npm install
 
-# Build the project
+# Start development server with hot reload
+npm run dev
+
+# Dashboard runs on http://localhost:3000
+# In development, it connects to MCP server at http://localhost:6666
+```
+
+### Building for Production
+
+```bash
+cd dashboard
+
+# Build the Next.js application
 npm run build
 
-# Start the server
-npm start
-
-# Server runs on http://localhost:6666
+# The build output is in .next/ directory
+# Ready to be containerized with the provided Dockerfile
 ```
 
 ## Storage Format
@@ -101,26 +209,36 @@ updated: 2025-07-10
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `6666` | HTTP server port |
+| `PORT` | `6666` | HTTP server port for MCP server |
 | `MEMORY_DIR` | `/app/data/root_vault` | Directory for storing Markdown files |
 | `NODE_ENV` | `production` | Node environment |
 
 ### Docker Configuration
 
-The `docker-compose.yml` includes:
+The `docker-compose.yml` includes two services:
+
+#### MCP Server (obsidian-memory-mcp)
 
 - Named volume `obsidian-data` bound to `./data` on host
 - Health check monitoring
 - Auto-restart policy
-- Port mapping `6666:6666`
+- Traefik labels for Coolify routing
+
+#### Dashboard (dashboard)
+
+- Next.js application container
+- Auto-restart policy
+- Traefik labels for Coolify routing
 
 #### Data Persistence
 
 Files are stored in:
+
 - **Host**: `./data/root_vault/` (bind mount)
 - **Container**: `/app/data/root_vault/`
 
 This allows:
+
 - Access to files from host machine
 - Data persistence across container restarts
 - Easy backup and management
@@ -130,13 +248,15 @@ This allows:
 ### Endpoints
 
 #### GET /health
-Health check endpoint.
+
+Health check endpoint for MCP server.
 
 ```bash
 curl http://localhost:6666/health
 ```
 
 Response:
+
 ```json
 {
   "status": "ok",
@@ -146,6 +266,7 @@ Response:
 ```
 
 #### POST /mcp
+
 MCP protocol endpoint for tool calls.
 
 ```bash
@@ -154,7 +275,16 @@ curl -X POST http://localhost:6666/mcp \
   -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
 ```
 
-### Available Tools
+#### GET /dashboard
+
+Next.js dashboard web interface.
+
+```bash
+# Access in browser
+http://localhost:6666/dashboard
+```
+
+### Available MCP Tools
 
 1. **create_entities** - Create new entities in the knowledge graph
 2. **create_relations** - Create relations between entities
@@ -165,6 +295,69 @@ curl -X POST http://localhost:6666/mcp \
 7. **read_graph** - Get the entire knowledge graph
 8. **search_nodes** - Search entities by query
 9. **open_nodes** - Get specific entities by name
+
+## Deployment
+
+### Deploying to Coolify
+
+1. **Push to GitHub**
+
+   ```bash
+   # Commit and push your changes
+   git add .
+   git commit -m "feat: Add dashboard feature"
+   git push origin main
+   ```
+
+2. **Create Resource in Coolify**
+
+   - Go to your Coolify dashboard
+   - Click "Create New Resource"
+   - Select your GitHub repository
+   - Choose "Docker Compose" as the build pack
+
+3. **Configure Domain**
+
+   - Domain: `http://your-server:6666`
+   - Coolify will automatically configure Traefik routing
+
+4. **Deploy**
+
+   Coolify will:
+   - Build both MCP server and dashboard containers
+   - Configure Traefik routing based on labels
+   - Start both services
+   - Route `/dashboard` to Next.js and `/mcp` to MCP server
+
+### Manual Docker Deployment
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Check status
+docker-compose ps
+```
+
+### Local Docker Testing
+
+```bash
+# Build all services
+docker-compose build
+
+# Start services
+docker-compose up -d
+
+# Test endpoints
+curl http://localhost:6666/health
+# Open http://localhost:6666/dashboard in browser
+
+# Stop services
+docker-compose down
+```
 
 ## Usage with Claude Desktop
 
@@ -210,6 +403,7 @@ Configure in Claude Desktop:
 4. Open Obsidian and view the graph
 
 The knowledge graph will be visualized with:
+
 - Entity files as nodes
 - `[[links]]` as edges
 - Different colors for different entity types (if configured in Obsidian)
@@ -254,6 +448,7 @@ docker-compose logs -f
 
 # Specific service
 docker-compose logs obsidian-memory-mcp
+docker-compose logs dashboard
 ```
 
 ### Check Status
@@ -281,7 +476,7 @@ ls -la data/root_vault/
 
 ## Development
 
-### Commands
+### MCP Server Commands
 
 ```bash
 # Install dependencies
@@ -303,25 +498,64 @@ npm run typecheck
 npm run clean
 ```
 
+### Dashboard Commands
+
+```bash
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Start development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Lint code
+npm run lint
+```
+
 ### Project Structure
 
 ```
 obsidian-memory-mcp/
-├── src/
-│   ├── index.ts              # Main entry point
-│   ├── types.ts              # TypeScript type definitions
+├── src/                          # MCP server source
+│   ├── index.ts                  # Main entry point
+│   ├── types.ts                  # TypeScript type definitions
 │   ├── storage/
 │   │   └── MarkdownStorageManager.ts  # Storage layer
 │   └── utils/
-│       ├── pathUtils.ts      # Path handling utilities
-│       └── markdownUtils.ts  # Markdown parsing/generation
-├── dist/                     # Compiled JavaScript
-├── data/                     # Persistent storage (bind mount)
-├── docker-compose.yml        # Docker configuration
-├── Dockerfile               # Docker image definition
-├── package.json             # NPM dependencies
-└── tsconfig.json           # TypeScript configuration
+│       ├── pathUtils.ts          # Path handling utilities
+│       └── markdownUtils.ts      # Markdown parsing/generation
+├── dist/                         # Compiled JavaScript (MCP server)
+├── dashboard/                    # Next.js dashboard application
+│   ├── src/
+│   │   └── app/
+│   │       ├── page.tsx          # Dashboard home page
+│   │       ├── layout.tsx        # Root layout
+│   │       └── globals.css       # Global styles
+│   ├── public/                   # Static assets
+│   ├── Dockerfile               # Dashboard containerization
+│   ├── package.json             # Dashboard dependencies
+│   ├── next.config.mjs          # Next.js configuration
+│   └── tsconfig.json            # TypeScript configuration
+├── data/                         # Persistent storage (bind mount)
+├── docker-compose.yml            # Docker configuration (both services)
+├── Dockerfile                    # MCP server containerization
+├── package.json                  # MCP server dependencies
+└── tsconfig.json                # TypeScript configuration
 ```
+
+### Key Files for Dashboard Development
+
+- `dashboard/src/app/page.tsx` - Main dashboard page
+- `dashboard/next.config.mjs` - Next.js configuration
+- `dashboard/Dockerfile` - Dashboard container build
+- `docker-compose.yml` - Service orchestration
 
 ## Troubleshooting
 
@@ -330,6 +564,7 @@ obsidian-memory-mcp/
 **Symptom**: `EACCES: permission denied` or `ENOENT: no such file or directory`
 
 **Solution**:
+
 ```bash
 # Manually create directory with proper permissions
 mkdir -p data/root_vault
@@ -342,9 +577,11 @@ docker-compose restart obsidian-memory-mcp
 **Symptom**: Container exits immediately or shows errors
 
 **Solution**:
+
 ```bash
 # Check logs for errors
 docker-compose logs obsidian-memory-mcp
+docker-compose logs dashboard
 
 # Rebuild and restart
 docker-compose down -v
@@ -357,6 +594,7 @@ docker-compose up -d
 **Symptom**: Files exist during container run but disappear after restart
 
 **Solution**:
+
 ```bash
 # Verify volume is properly mounted
 docker inspect obsidian-memory-mcp | grep -A 20 Mounts
@@ -369,6 +607,7 @@ docker inspect obsidian-memory-mcp | grep -A 20 Mounts
 **Symptom**: `docker-compose ps` shows unhealthy
 
 **Solution**:
+
 ```bash
 # Check if port is in use
 lsof -i :6666
@@ -380,6 +619,84 @@ curl http://localhost:6666/health
 docker-compose restart obsidian-memory-mcp
 ```
 
+### Dashboard Not Loading
+
+**Symptom**: `/dashboard` returns 404 or error
+
+**Solution**:
+
+```bash
+# Check dashboard container logs
+docker-compose logs dashboard
+
+# Verify Traefik labels are applied
+docker inspect obsidian-dashboard | grep -A 10 Labels
+
+# Check Traefik routing
+curl -v http://localhost:6666/dashboard
+```
+
+### Build Failures
+
+**Symptom**: Docker build fails
+
+**Solution**:
+
+```bash
+# Check build logs
+docker-compose build --no-cache
+
+# Verify all required files exist
+ls -la dashboard/
+
+# Test build locally
+cd dashboard
+npm install
+npm run build
+```
+
+## Contributing
+
+### Adding New Dashboard Features
+
+1. Create a new branch from `main`:
+
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+
+2. Make changes in `dashboard/src/app/`
+3. Test locally with `npm run dev`
+4. Build and test production mode with `npm run build`
+5. Commit and push:
+
+   ```bash
+   git add dashboard/
+   git commit -m "feat: Add your feature"
+   git push origin feature/your-feature
+   ```
+
+6. Create a pull request on GitHub
+
+### Adding New MCP Tools
+
+1. Add tool definition in `src/index.ts`
+2. Implement tool logic in appropriate module
+3. Update API Reference in this README
+4. Test with `curl` commands
+
+## Roadmap
+
+Future enhancements for the dashboard:
+
+- [ ] Knowledge graph visualization
+- [ ] Entity relationship browser
+- [ ] Search functionality
+- [ ] Statistics dashboard
+- [ ] Bulk operations
+- [ ] Import/Export tools
+- [ ] Dark mode theme
+
 ## Credits
 
 This project is based on [Anthropic's memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) from the Model Context Protocol servers collection. We thank Anthropic for releasing the original implementation under the MIT license.
@@ -388,7 +705,7 @@ This project is based on [Anthropic's memory server](https://github.com/modelcon
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-Original memory server: Copyright (c) 2024 Anthropic, PBC  
+Original memory server: Copyright (c) 2024 Anthropic, PBC
 Obsidian integration modifications: Copyright (c) 2025 Ntrakiyski
 
 ## Support
