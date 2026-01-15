@@ -10,7 +10,8 @@
   "dependencies": {
     "next": "14.x",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5",
