@@ -316,6 +316,20 @@ async function main() {
       return;
     }
 
+    if (req.method === 'GET' && req.url === '/count') {
+      try {
+        const files = fs.readdirSync(MEMORY_DIR);
+        const mdFiles = files.filter(f => f.endsWith('.md'));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ count: mdFiles.length }));
+        return;
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to count files' }));
+        return;
+      }
+    }
+
     if (req.method === 'POST' && req.url === '/mcp') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
