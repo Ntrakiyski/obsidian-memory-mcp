@@ -1,11 +1,6 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   output: "standalone",
-  // Set Turbopack root to avoid lockfile conflicts
-  turbopack: {
-    root: __dirname,
-  },
   // Handle rewrites for proper routing behind proxy
   async rewrites() {
     return [
@@ -17,4 +12,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

@@ -52,8 +52,8 @@ export default function McpToolsPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
 
-  // Use environment variable for MCP endpoint, fallback to public URL in production
-  const MCP_ENDPOINT = process.env.NEXT_PUBLIC_MCP_URL || "https://obsidian-mcp.trakiyski.work/mcp"
+  // Use API route for MCP communication (server-side proxy)
+  const MCP_ENDPOINT = "/api/mcp"
 
   // Initialize MCP session and fetch tools
   useEffect(() => {

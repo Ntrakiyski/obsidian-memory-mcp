@@ -20,19 +20,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Set NODE_ENV
+ENV NODE_ENV=production
 
-# Install production dependencies only
-RUN npm ci --omit=dev
-
-# Copy built application from builder
-COPY --from=builder /app/.next ./.next
+# Copy standalone output from builder
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
 
 # Expose port
 EXPOSE 3000
 
-# Start the application
-CMD ["npm", "start"]
+# Start the standalone server
+CMD ["node", "server.js"]
