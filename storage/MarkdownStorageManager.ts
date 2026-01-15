@@ -28,8 +28,13 @@ export class MarkdownStorageManager {
   private async ensureMemoryDir(): Promise<void> {
     try {
       await fs.mkdir(this.memoryDir, { recursive: true });
-    } catch (error) {
-      throw new Error(`Failed to create memory directory: ${error}`);
+    } catch (error: any) {
+      // Ignore errors if directory already exists (EEXIST) or permission denied (EACCES)
+      // These are acceptable in Docker environments where the directory may already be created
+      // by the entrypoint script or mounted volume
+      if (error.code !== 'EEXIST' && error.code !== 'EACCES') {
+        throw new Error(`Failed to create memory directory: ${error}`);
+      }
     }
   }
 
