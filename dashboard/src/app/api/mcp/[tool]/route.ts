@@ -1,33 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mcpClient, MCPTool, MCPToolResult } from '@/lib/mcp-client';
+
+// Get MCP server URL from environment
+const getMcpUrl = () => {
+  // In production, use internal Docker URL; locally use localhost
+  return process.env.NEXT_PUBLIC_BASE_URL 
+    ? `${process.env.NEXT_PUBLIC_BASE_URL}/mcp`
+    : 'http://localhost:6666/mcp';
+};
+
+// Generic JSON-RPC request handler
+async function callMcpMethod(method: string, params?: Record<string, any>) {
+  const mcpUrl = getMcpUrl();
+  console.log(`📡 Calling MCP: ${method} at ${mcpUrl}`);
+  
+  const response = await fetch(mcpUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method,
+      params: params || {},
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ MCP HTTP Error: ${response.status} ${response.statusText}`);
+    console.error(`Error body: ${errorText}`);
+    throw new Error(`MCP request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  
+  if (result.error) {
+    console.error('❌ MCP JSON-RPC Error:', result.error);
+    throw new Error(`MCP error: ${result.error.message}`);
+  }
+  
+  console.log(`✅ MCP ${method} response:`, result.result);
+  return result.result;
+}
 
 // GET /api/mcp/[tool] - List available tools
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ tool: string }> }
-): Promise<NextResponse> {
+) {
   try {
     const { tool } = await params;
 
-    // For listing tools, we use a special endpoint
     if (tool === 'list' || tool === 'tools') {
-      const tools = await mcpClient.listTools();
+      // Call tools/list method
+      const result = await callMcpMethod('tools/list');
       return NextResponse.json({
         success: true,
-        tools: tools,
+        tools: result.tools || [],
       });
     }
 
-    // For specific tool info, return tool details
-    const tools = await mcpClient.listTools();
-    const targetTool = tools.find(t => t.name === tool);
+    // For specific tool info, we need to list all tools and find the one
+    const toolsResult = await callMcpMethod('tools/list');
+    const tools = toolsResult.tools || [];
+    const targetTool = tools.find((t: any) => t.name === tool);
 
     if (!targetTool) {
       return NextResponse.json(
         {
           success: false,
           error: `Tool '${tool}' not found`,
-          availableTools: tools.map(t => t.name),
+          availableTools: tools.map((t: any) => t.name),
         },
         { status: 404 }
       );
@@ -53,10 +98,12 @@ export async function GET(
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tool: string }> }
-): Promise<NextResponse> {
+) {
   try {
     const { tool } = await params;
     const body = await request.json();
+
+    console.log(`🚀 Calling tool: ${tool}`, body.args);
 
     // Validate tool name
     if (!tool || typeof tool !== 'string') {
@@ -69,54 +116,14 @@ export async function POST(
       );
     }
 
-    // Get available tools to validate
-    const tools = await mcpClient.listTools();
-    const targetTool = tools.find(t => t.name === tool);
+    // Call the tool using tools/call method
+    const result = await callMcpMethod('tools/call', {
+      name: tool,
+      arguments: body.args || {},
+    });
 
-    if (!targetTool) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Tool '${tool}' not found`,
-          availableTools: tools.map(t => t.name),
-        },
-        { status: 404 }
-      );
-    }
-
-    // Validate arguments against tool's input schema
-    const args = body.args || {};
-    const requiredFields = targetTool.inputSchema.required || [];
+    console.log(`✅ Tool ${tool} executed successfully`);
     
-    for (const field of requiredFields) {
-      if (!(field in args) || args[field] === undefined || args[field] === null) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Missing required argument: ${field}`,
-            tool: targetTool.name,
-            requiredFields,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Call the tool
-    const result = await mcpClient.callTool(tool, args);
-
-    // Check for errors
-    if (result.isError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Tool execution failed',
-          result,
-        },
-        { status: 400 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
       result,
