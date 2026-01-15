@@ -48,6 +48,10 @@ services:
     # Restart policy - keep the service running
     restart: unless-stopped
     
+    # Environment variables
+    environment:
+      - NEXT_PUBLIC_BASE_URL=https://obsidian.trakiyski.work
+    
     # Traefik routing labels for Coolify
     labels:
       - "traefik.enable=true"

@@ -19,8 +19,11 @@ interface KnowledgeGraph {
   relations: Relation[];
 }
 
+// Get base URL from environment or use default
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:6666';
+
 async function callMcpTool(toolName: string, args?: Record<string, any>) {
-  const response = await fetch('http://localhost:6666/mcp', {
+  const response = await fetch(`${BASE_URL}/mcp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -47,7 +50,7 @@ export default function Dashboard() {
   
   useEffect(() => {
     // Fetch note count
-    fetch('http://localhost:6666/count')
+    fetch(`${BASE_URL}/count`)
       .then(res => res.json())
       .then(data => setCount(data.count))
       .catch(() => setCount(0));
