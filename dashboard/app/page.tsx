@@ -91,8 +91,8 @@ export default function ObsidianVault() {
 
   const metadata = useMemo(() => {
     if (!activeFileId) return undefined
-    return getFileMetadata(activeFileId)
-  }, [activeFileId])
+    return getFileMetadata(activeFileId, fileContents)
+  }, [activeFileId, fileContents])
 
   const handleSelectFile = (id: string) => {
     setActiveFileId(id)

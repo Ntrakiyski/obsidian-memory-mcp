@@ -256,14 +256,52 @@ export function findFile(items: TreeNode[], id: string): string | null {
   return null
 }
 
-export function getFileMetadata(id: string) {
-  const content = fileContents[id] || ""
+// Parse YAML frontmatter from markdown content
+function parseFrontmatter(content: string): {
+  entityType?: string
+  created?: string
+  updated?: string
+} {
+  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---/
+  const match = content.match(frontmatterRegex)
+
+  if (!match) return {}
+
+  const frontmatterText = match[1]
+  const result: Record<string, string> = {}
+
+  // Simple YAML parser for key-value pairs
+  frontmatterText.split('\n').forEach(line => {
+    const colonIndex = line.indexOf(':')
+    if (colonIndex > 0) {
+      const key = line.substring(0, colonIndex).trim()
+      let value = line.substring(colonIndex + 1).trim()
+      // Remove quotes if present
+      if ((value.startsWith("'") && value.endsWith("'")) ||
+          (value.startsWith('"') && value.endsWith('"'))) {
+        value = value.slice(1, -1)
+      }
+      result[key] = value
+    }
+  })
+
+  return {
+    entityType: result.entityType,
+    created: result.created,
+    updated: result.updated,
+  }
+}
+
+export function getFileMetadata(id: string, contents: Record<string, string> = fileContents) {
+  const content = contents[id] || ""
+  const frontmatter = parseFrontmatter(content)
+
   const words = content
     .trim()
     .split(/\s+/)
     .filter((w) => w.length > 0).length
   const links = content.match(/\[\[([^\]]+)\]\]/g) || []
-  const backlinks = Object.entries(fileContents)
+  const backlinks = Object.entries(contents)
     .filter(([key, val]) => key !== id && val.includes(`[[${id}`))
     .map(([key]) => key)
 
@@ -272,11 +310,10 @@ export function getFileMetadata(id: string) {
     charCount: content.length,
     links: links.map((l) => l.replace(/\[\[|\]\]/g, "").split("|")[0]),
     backlinks,
-    created: "Jan 10, 2025",
-    modified: "2 minutes ago",
-    // Example of how to add custom fields dynamically
-    tags: ["notes", "active"],
-    category: "Daily",
-    status: "Published",
+    // Use actual frontmatter data with fallbacks
+    // Note: using "modified" to match MetadataPanel's defaultFields
+    modified: frontmatter.updated || "Unknown",
+    created: frontmatter.created || "Unknown",
+    entityType: frontmatter.entityType || "Unknown",
   }
 }
