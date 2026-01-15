@@ -50,7 +50,9 @@ services:
     
     # Environment variables
     environment:
-      - NEXT_PUBLIC_BASE_URL=https://obsidian.trakiyski.work
+      # Use internal Docker network URL for MCP server communication
+      # The dashboard calls /api/mcp/* routes which then connect to the MCP server
+      - NEXT_PUBLIC_BASE_URL=http://obsidian-memory-mcp:6666
     
     # Traefik routing labels for Coolify
     labels:

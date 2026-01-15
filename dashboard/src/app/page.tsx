@@ -22,7 +22,12 @@ interface KnowledgeGraph {
 }
 
 // Get base URL from environment or use default
+// For internal Docker communication, use service name
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:6666';
+
+// Display URL for UI - show public URL if available, otherwise show internal
+const DISPLAY_URL = process.env.NEXT_PUBLIC_MCP_DISPLAY_URL || 
+                   (process.env.NODE_ENV === 'production' ? 'https://obsidian-mcp.trakiyski.work' : BASE_URL);
 
 export default function Dashboard() {
   const [count, setCount] = useState<number | null>(null);
@@ -136,7 +141,7 @@ export default function Dashboard() {
       </main>
 
       <footer className="dashboard-footer">
-        <p>Connected to MCP server at {BASE_URL}</p>
+        <p>Connected to MCP server at {DISPLAY_URL}</p>
       </footer>
     </div>
   );
