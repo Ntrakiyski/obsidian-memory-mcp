@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -55,12 +55,27 @@ export default function McpToolsPage() {
   // Use API route for MCP communication (server-side proxy)
   const MCP_ENDPOINT = "/api/mcp"
 
+  // Track initialization to prevent race conditions
+  const initializingRef = useRef(false)
+  const mountedRef = useRef(true)
+
   // Initialize MCP session and fetch tools
   useEffect(() => {
+    mountedRef.current = true
     initializeAndFetchTools()
+
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   const initializeAndFetchTools = async () => {
+    // Prevent multiple simultaneous initializations
+    if (initializingRef.current) {
+      return
+    }
+    initializingRef.current = true
+
     setLoading(true)
     setError(null)
 
@@ -70,11 +85,11 @@ export default function McpToolsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: 1,
+          id: Date.now(),
           method: "initialize",
           params: {
             protocolVersion: "2024-11-05",
@@ -87,13 +102,21 @@ export default function McpToolsPage() {
         }),
       })
 
+      if (!mountedRef.current) return
+
+      if (!initResponse.ok) {
+        throw new Error(`MCP server returned ${initResponse.status}: ${initResponse.statusText}`)
+      }
+
       // Get session ID if provided
       const newSessionId = initResponse.headers.get("Mcp-Session-Id")
-      if (newSessionId) {
+      if (newSessionId && mountedRef.current) {
         setSessionId(newSessionId)
       }
 
       const initResult = await initResponse.json()
+
+      if (!mountedRef.current) return
 
       if (initResult.error) {
         throw new Error(initResult.error.message || "Failed to initialize MCP session")
@@ -104,7 +127,7 @@ export default function McpToolsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
+          Accept: "application/json",
           ...(newSessionId && { "Mcp-Session-Id": newSessionId }),
         },
         body: JSON.stringify({
@@ -113,23 +136,33 @@ export default function McpToolsPage() {
         }),
       })
 
+      if (!mountedRef.current) return
+
       // Now fetch tools list
       const toolsResponse = await fetch(MCP_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
+          Accept: "application/json",
           ...(newSessionId && { "Mcp-Session-Id": newSessionId }),
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: 2,
+          id: Date.now(),
           method: "tools/list",
           params: {},
         }),
       })
 
+      if (!mountedRef.current) return
+
+      if (!toolsResponse.ok) {
+        throw new Error(`MCP server returned ${toolsResponse.status}: ${toolsResponse.statusText}`)
+      }
+
       const toolsResult = await toolsResponse.json()
+
+      if (!mountedRef.current) return
 
       if (toolsResult.error) {
         throw new Error(toolsResult.error.message || "Failed to fetch tools")
@@ -137,9 +170,14 @@ export default function McpToolsPage() {
 
       setTools(toolsResult.result?.tools || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect to MCP server")
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : "Failed to connect to MCP server")
+      }
     } finally {
-      setLoading(false)
+      if (mountedRef.current) {
+        setLoading(false)
+      }
+      initializingRef.current = false
     }
   }
 
@@ -152,7 +190,7 @@ export default function McpToolsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
+          Accept: "application/json",
           ...(sessionId && { "Mcp-Session-Id": sessionId }),
         },
         body: JSON.stringify({
@@ -350,7 +388,7 @@ export default function McpToolsPage() {
               <h1 className="text-xl font-semibold">MCP Tools Explorer</h1>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={initializeAndFetchTools} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={initializeAndFetchTools} disabled={loading || initializingRef.current}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -370,7 +408,7 @@ export default function McpToolsPage() {
               <CardDescription>{error}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={initializeAndFetchTools}>
+              <Button onClick={initializeAndFetchTools} disabled={initializingRef.current}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry Connection
               </Button>
