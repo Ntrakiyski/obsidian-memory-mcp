@@ -18,7 +18,7 @@ export default function ObsidianVault() {
   const [error, setError] = useState<string | null>(null)
 
   // UI state
-  const [activeFileId, setActiveFileId] = useState<string | null>(null)
+  const [activeFileId, setActiveFileId] = useState<string | undefined>(undefined)
   const [content, setContent] = useState("")
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [showSidebar, setShowSidebar] = useState(true)
@@ -55,7 +55,7 @@ export default function ObsidianVault() {
 
         // Set first file as active if available
         const firstFile = findFirstFile(data.nodes || [])
-        if (firstFile) {
+        if (firstFile && firstFile.id) {
           setActiveFileId(firstFile.id)
           setContent((data.fileContents || {})[firstFile.id] || "")
         }
@@ -90,7 +90,7 @@ export default function ObsidianVault() {
   }, [activeFileId, folders])
 
   const metadata = useMemo(() => {
-    if (!activeFileId) return null
+    if (!activeFileId) return undefined
     return getFileMetadata(activeFileId)
   }, [activeFileId])
 
@@ -372,7 +372,7 @@ export default function ObsidianVault() {
               onChange={handleContentChange}
               isDirty={isDirty}
               onSave={handleSave}
-              onRename={(newName) => handleRename(activeFileId, newName, "file")}
+              onRename={activeFileId ? (newName) => handleRename(activeFileId, newName, "file") : undefined}
             />
           </div>
 
@@ -402,7 +402,7 @@ export default function ObsidianVault() {
                 onMouseDown={() => setResizingPanel("metadata")}
               />
               <div className="shrink-0 overflow-y-auto" style={{ width: `${metadataWidth}px` }}>
-                <MetadataPanel fileName={currentFileName} metadata={metadata} />
+                <MetadataPanel fileName={currentFileName} metadata={metadata || {}} />
               </div>
             </>
           )}
