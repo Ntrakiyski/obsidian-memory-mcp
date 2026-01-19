@@ -9,6 +9,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Entity, Relation } from './types.js';
 import { MarkdownStorageManager } from './storage/MarkdownStorageManager.js';
+import { syncObsidianNeo4j } from './src/sync/index.js';
+import { startSyncScheduler, getSchedulerStatus } from './src/sync/scheduler.js';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -262,6 +264,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: "sync_obsidian_neo4j",
+        description: "Bidirectional sync between Neo4j and Obsidian markdown files. Fetches memories from Neo4j, updates Obsidian vault, and syncs changes back to Neo4j.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            direction: {
+              type: "string",
+              enum: ["neo4j_to_obsidian", "obsidian_to_neo4j", "both"],
+              description: "Sync direction: 'neo4j_to_obsidian' (Neo4j → Obsidian), 'obsidian_to_neo4j' (Obsidian → Neo4j), or 'both' (bidirectional, default)"
+            }
+          },
+        },
+      },
+      {
+        name: "get_scheduler_status",
+        description: "Get the current status of the sync scheduler, including enabled state, last sync time, and next scheduled sync.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -297,6 +321,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: JSON.stringify(await storageManager.openNodes(args.names as string[]), null, 2) }] };
     case "get_all_nodes":
       return { content: [{ type: "text", text: JSON.stringify(await storageManager.getAllNodes(), null, 2) }] };
+    case "sync_obsidian_neo4j": {
+      const direction = (args.direction as string) || 'both';
+      const result = await syncObsidianNeo4j({ direction: direction as 'neo4j_to_obsidian' | 'obsidian_to_neo4j' | 'both' });
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    }
+    case "get_scheduler_status": {
+      const status = getSchedulerStatus();
+      return { content: [{ type: "text", text: JSON.stringify(status) }] };
+    }
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -553,6 +586,28 @@ async function main() {
                     properties: {},
                   },
                 },
+                {
+                  name: "sync_obsidian_neo4j",
+                  description: "Bidirectional sync between Neo4j and Obsidian markdown files. Fetches memories from Neo4j, updates Obsidian vault, and syncs changes back to Neo4j.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      direction: {
+                        type: "string",
+                        enum: ["neo4j_to_obsidian", "obsidian_to_neo4j", "both"],
+                        description: "Sync direction: 'neo4j_to_obsidian' (Neo4j → Obsidian), 'obsidian_to_neo4j' (Obsidian → Neo4j), or 'both' (bidirectional, default)"
+                      }
+                    },
+                  },
+                },
+                {
+                  name: "get_scheduler_status",
+                  description: "Get the current status of the sync scheduler, including enabled state, last sync time, and next scheduled sync.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {},
+                  },
+                },
               ],
             };
           } else if (request.method === 'tools/call') {
@@ -597,6 +652,17 @@ async function main() {
               case "get_all_nodes":
                 result = { content: [{ type: "text", text: JSON.stringify(await storageManager.getAllNodes(), null, 2) }] };
                 break;
+              case "sync_obsidian_neo4j": {
+                const direction = (args.direction as string) || 'both';
+                const syncResult = await syncObsidianNeo4j({ direction: direction as 'neo4j_to_obsidian' | 'obsidian_to_neo4j' | 'both' });
+                result = { content: [{ type: "text", text: JSON.stringify(syncResult) }] };
+                break;
+              }
+              case "get_scheduler_status": {
+                const status = getSchedulerStatus();
+                result = { content: [{ type: "text", text: JSON.stringify(status) }] };
+                break;
+              }
               default:
                 throw new Error(`Unknown tool: ${name}`);
             }
@@ -633,6 +699,15 @@ async function main() {
     console.error(`Endpoints:`);
     console.error(`  - GET  /health - Health check`);
     console.error(`  - POST /mcp   - MCP endpoint`);
+
+    // Start sync scheduler if enabled
+    if (process.env.ENABLE_SYNC === 'true') {
+      const interval = process.env.SYNC_INTERVAL_MINUTES || '5';
+      console.error(`Sync scheduler: ENABLED (every ${interval} minutes)`);
+      startSyncScheduler();
+    } else {
+      console.error(`Sync scheduler: DISABLED (set ENABLE_SYNC=true to enable)`);
+    }
   });
 }
 

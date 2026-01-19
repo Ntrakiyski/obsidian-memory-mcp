@@ -18,6 +18,10 @@ services:
       - NODE_ENV=production
       - PORT=6666
       - MEMORY_DIR=/app/data/root_vault
+      # Sync configuration
+      - ENABLE_SYNC=true
+      - SYNC_INTERVAL_MINUTES=5
+      - NEO4J_MCP_URL=http://0brainos-mcp:9131/mcp
     
     # Restart policy - keep the server running
     restart: unless-stopped
@@ -50,8 +54,10 @@ services:
 
     # Environment variables
     environment:
-      # Use public URL for MCP server connection
-      - MCP_URL=https://obsidian-mcp.trakiyski.work/mcp
+      # Use container name for local testing (change to public URL for production)
+      - MCP_URL=http://obsidian-memory-mcp:6666/mcp
+      - ENABLE_SYNC=true
+      - SYNC_INTERVAL_MINUTES=5
 
     # Traefik routing labels for Coolify
     labels:
