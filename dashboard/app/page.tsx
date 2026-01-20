@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { Search, Settings, Network, Menu, X, Info, Loader2, AlertCircle } from "lucide-react"
 import { FileTree } from "@/components/file-tree"
 import { Editor } from "@/components/editor"
@@ -11,7 +10,6 @@ import { findFile, getFileMetadata, TreeNode } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export default function ObsidianVault() {
-  const router = useRouter()
 
   // Data state
   const [folders, setFolders] = useState<TreeNode[]>([])
@@ -28,6 +26,8 @@ export default function ObsidianVault() {
   const [showGraphPanel, setShowGraphPanel] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDirty, setIsDirty] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [sidebarWidth, setSidebarWidth] = useState(256)
   const [editorWidth, setEditorWidth] = useState(60)
@@ -108,9 +108,40 @@ export default function ObsidianVault() {
     setIsDirty(true)
   }
 
-  const handleSave = () => {
-    setIsDirty(false)
-  }
+  const handleSave = async () => {
+    if (!activeFileId || !currentFileName) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      // Get entity name from file name (remove .md extension)
+      const entityName = currentFileName.endsWith(".md")
+        ? currentFileName.slice(0, -3)
+        : currentFileName;
+
+      const response = await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityName,
+          content,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to save");
+      }
+
+      setIsDirty(false);
+    } catch (error) {
+      console.error("Error saving:", error);
+      setSaveError(error instanceof Error ? error.message : "Failed to save");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleLinkClick = (linkId: string) => {
     if (fileContents[linkId]) {
@@ -140,14 +171,6 @@ export default function ObsidianVault() {
 
     renameItem(newStructure)
     setFolders(newStructure)
-  }
-
-  const handleEditPage = () => {
-    if (currentFileName && currentFileName !== "No file selected") {
-      // Extract entity name from file name (remove .md extension)
-      const entityName = currentFileName
-      router.push(`/entities/${encodeURIComponent(entityName)}/edit`)
-    }
   }
 
   const handleCreateNew = (type: "file" | "folder", parentFolder?: string, customName?: string) => {
@@ -382,9 +405,9 @@ export default function ObsidianVault() {
               content={content}
               onChange={handleContentChange}
               isDirty={isDirty}
+              isSaving={isSaving}
               onSave={handleSave}
               onRename={activeFileId ? (newName) => handleRename(activeFileId, newName, "file") : undefined}
-              onEditPage={activeFileId ? handleEditPage : undefined}
             />
           </div>
 

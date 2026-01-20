@@ -31,10 +31,11 @@ import {
   ImageIcon,
   Type,
   Copy,
+  Save,
+  Loader2,
   Pencil,
   Check,
   X,
-  ExternalLink,
 } from "lucide-react"
 
 const lowlight = createLowlight(common)
@@ -45,9 +46,9 @@ interface EditorProps {
   fileName?: string
   fileId?: string
   isDirty?: boolean
+  isSaving?: boolean
   onSave?: () => void
   onRename?: (newName: string) => void
-  onEditPage?: () => void
 }
 
 interface SlashCommand {
@@ -224,7 +225,7 @@ const slashCommands: SlashCommand[] = [
   },
 ]
 
-export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, onRename, onEditPage }: EditorProps) {
+export function Editor({ content, onChange, fileName, fileId, isDirty, isSaving, onSave, onRename }: EditorProps) {
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 })
   const [slashFilter, setSlashFilter] = useState("")
@@ -436,14 +437,20 @@ export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, o
           </div>
         )}
         <div className="flex items-center gap-2">
-          {onEditPage && (
+          {onSave && (
             <button
-              onClick={onEditPage}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
-              title="Edit in dedicated page"
+              onClick={onSave}
+              disabled={isSaving || !isDirty}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors",
+                isSaving || !isDirty
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+              )}
+              title="Save changes"
             >
-              <ExternalLink className="h-4 w-4" />
-              Edit Page
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {isSaving ? "Saving..." : "Save"}
             </button>
           )}
           <button
