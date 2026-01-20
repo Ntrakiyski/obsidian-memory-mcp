@@ -21,7 +21,7 @@ services:
       # Sync configuration
       - ENABLE_SYNC=true
       - SYNC_INTERVAL_MINUTES=5
-      - NEO4J_MCP_URL=http://0brainos-mcp:9131/mcp
+      - NEO4J_MCP_URL=https://0brainos-mcp.trakiyski.work/mcp
     
     # Restart policy - keep the server running
     restart: unless-stopped
@@ -54,8 +54,8 @@ services:
 
     # Environment variables
     environment:
-      # Use container name for local testing (change to public URL for production)
-      - MCP_URL=http://obsidian-memory-mcp:6666/mcp
+      # Use public URL for Coolify deployment (Traefik routing)
+      - MCP_URL=https://obsidian-mcp.trakiyski.work/mcp
       - ENABLE_SYNC=true
       - SYNC_INTERVAL_MINUTES=5
 
