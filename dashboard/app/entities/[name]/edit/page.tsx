@@ -84,11 +84,12 @@ export default function EditEntityPage() {
 
         const result = JSON.parse(data.result.content[0].text);
 
-        if (!result.nodes || result.nodes.length === 0) {
+        // openNodes returns { entities: [...], relations: [...] }
+        if (!result.entities || result.entities.length === 0) {
           throw new Error(`Entity "${entityName}" not found`);
         }
 
-        const node = result.nodes[0];
+        const node = result.entities[0];
         setEntity(node);
 
         // Build markdown content from entity
