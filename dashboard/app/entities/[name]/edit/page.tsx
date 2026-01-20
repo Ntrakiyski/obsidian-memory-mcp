@@ -32,7 +32,9 @@ interface MCPResponse {
 export default function EditEntityPage() {
   const params = useParams();
   const router = useRouter();
-  const entityName = decodeURIComponent(params.name as string);
+  // Remove .md extension from entity name if present
+  const rawName = decodeURIComponent(params.name as string);
+  const entityName = rawName.endsWith('.md') ? rawName.slice(0, -3) : rawName;
 
   const [entity, setEntity] = useState<Entity | null>(null);
   const [content, setContent] = useState<string>('');
@@ -185,8 +187,8 @@ export default function EditEntityPage() {
         throw new Error(data.error.message);
       }
 
-      // Redirect back to home with entity selected
-      router.push(`/?entity=${encodeURIComponent(entity.name)}`);
+      // Redirect back to home
+      router.push('/');
     } catch (err) {
       console.error('Error saving:', err);
       setError(err instanceof Error ? err.message : 'Failed to save changes');
@@ -234,7 +236,7 @@ export default function EditEntityPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
         <div className="flex items-center gap-4">
-          <Link href={`/?entity=${encodeURIComponent(entity.name)}`}>
+          <Link href="/">
             <Button size="sm" variant="ghost">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back

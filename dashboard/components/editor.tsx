@@ -34,6 +34,7 @@ import {
   Pencil,
   Check,
   X,
+  ExternalLink,
 } from "lucide-react"
 
 const lowlight = createLowlight(common)
@@ -46,6 +47,7 @@ interface EditorProps {
   isDirty?: boolean
   onSave?: () => void
   onRename?: (newName: string) => void
+  onEditPage?: () => void
 }
 
 interface SlashCommand {
@@ -222,7 +224,7 @@ const slashCommands: SlashCommand[] = [
   },
 ]
 
-export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, onRename }: EditorProps) {
+export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, onRename, onEditPage }: EditorProps) {
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 })
   const [slashFilter, setSlashFilter] = useState("")
@@ -433,16 +435,28 @@ export function Editor({ content, onChange, fileName, fileId, isDirty, onSave, o
             {isDirty && <span className="text-xs text-muted-foreground">(unsaved)</span>}
           </div>
         )}
-        <button
-          onClick={copyToClipboard}
-          className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors",
-            "bg-muted hover:bg-accent",
+        <div className="flex items-center gap-2">
+          {onEditPage && (
+            <button
+              onClick={onEditPage}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+              title="Edit in dedicated page"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Edit Page
+            </button>
           )}
-        >
-          <Copy className="h-4 w-4" />
-          {copied ? "Copied!" : "Copy"}
-        </button>
+          <button
+            onClick={copyToClipboard}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors",
+              "bg-muted hover:bg-accent",
+            )}
+          >
+            <Copy className="h-4 w-4" />
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
       </div>
 
       <div ref={editorRef} className="flex-1 overflow-y-auto relative">

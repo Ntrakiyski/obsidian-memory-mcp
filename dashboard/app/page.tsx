@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Search, Settings, Network, Menu, X, Info, Loader2, AlertCircle } from "lucide-react"
 import { FileTree } from "@/components/file-tree"
 import { Editor } from "@/components/editor"
@@ -10,6 +11,8 @@ import { findFile, getFileMetadata, TreeNode } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export default function ObsidianVault() {
+  const router = useRouter()
+
   // Data state
   const [folders, setFolders] = useState<TreeNode[]>([])
   const [fileContents, setFileContents] = useState<Record<string, string>>({})
@@ -137,6 +140,14 @@ export default function ObsidianVault() {
 
     renameItem(newStructure)
     setFolders(newStructure)
+  }
+
+  const handleEditPage = () => {
+    if (currentFileName && currentFileName !== "No file selected") {
+      // Extract entity name from file name (remove .md extension)
+      const entityName = currentFileName
+      router.push(`/entities/${encodeURIComponent(entityName)}/edit`)
+    }
   }
 
   const handleCreateNew = (type: "file" | "folder", parentFolder?: string, customName?: string) => {
@@ -373,6 +384,7 @@ export default function ObsidianVault() {
               isDirty={isDirty}
               onSave={handleSave}
               onRename={activeFileId ? (newName) => handleRename(activeFileId, newName, "file") : undefined}
+              onEditPage={activeFileId ? handleEditPage : undefined}
             />
           </div>
 
